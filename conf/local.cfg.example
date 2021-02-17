@@ -180,6 +180,24 @@ InternalName = example
 -- DeadlinePenalty = 3/4
 
 --|
+--|  Option "VirtualDeadlines"
+--|    Required: optional
+--|
+--|  This option sets deadlines for all contestnts as virtual start time + VirtualContestsTime (see below)
+--|
+
+-- VirtualDeadlines = False
+
+--|
+--|  Option "VirtualContestsTime"
+--|    Required: optional
+--|
+--|  Time in seconds for calculate virtual deadline
+--|
+
+-- VirtualContestsTime = 0
+
+--|
 --|  Section "SetFixedDeadline"
 --|
 --|    Required: optional (can be specified more than once)
