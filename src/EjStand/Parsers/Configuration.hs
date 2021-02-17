@@ -369,6 +369,8 @@ buildStandingConfig path = do
   showProblemStatistics  <- takeUniqueValue ||> toTextValue ||> toBool .> fromMaybe False $ "ShowProblemStatistics"
   fractionDisplayStyle   <-
     takeUniqueValue ||> toTextValue ||> toFractionDisplayStyle .> fromMaybe DisplayAsFraction $ "DecimalPrecision"
+  virtualDeadlines       <- takeUniqueValue ||> toTextValue ||> toBool .> fromMaybe False $ "VirtualDeadlines"
+  virtualContestsTime    <- takeUniqueValue ||> toTextValue ||> toInteger .> fromMaybe 0 $ "VirtualContestsTime"
   !_                     <- ensureEmptyState
   return $ StandingConfig { standingName           = standingName
                           , standingContests       = standingContests
@@ -392,6 +394,8 @@ buildStandingConfig path = do
                           , showLanguages          = showLanguages
                           , showProblemStatistics  = showProblemStatistics
                           , fractionDisplayStyle   = fractionDisplayStyle
+                          , virtualDeadlines       = virtualDeadlines
+                          , virtualContestsTime    = virtualContestsTime
                           }
 
 parseStandingConfig :: FilePath -> IO StandingConfig

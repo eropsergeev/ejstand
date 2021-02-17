@@ -144,6 +144,8 @@ data StandingConfig = StandingConfig { standingName           :: !Text
                                      , showLanguages          :: !Bool
                                      , showProblemStatistics  :: !Bool
                                      , fractionDisplayStyle   :: !FractionDisplayStyle
+                                     , virtualDeadlines       :: !Bool
+                                     , virtualContestsTime    :: !Integer
                                      }
 
 data RunStatusType =  Ignore | Mistake | Rejected | Processing | Pending | Success | Disqualified | Error

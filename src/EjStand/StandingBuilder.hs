@@ -24,7 +24,9 @@ import qualified Data.Set                      as Set
 import           Data.Text                      ( Text
                                                 , unpack
                                                 )
-import           Data.Time                      ( UTCTime )
+import           Data.Time                      ( UTCTime
+                                                , addUTCTime
+                                                )
 import           EjStand.Internals.Core         ( fromIdentifiableList )
 import           EjStand.Models.Base
 import           EjStand.Models.Standing
@@ -57,12 +59,18 @@ isAppliableDeadlineOption Problem {..} Contestant {..} FixedDeadline {..}
   | otherwise = False
 
 calculateDeadline :: StandingConfig -> StandingSource -> Problem -> Contestant -> Maybe UTCTime
-calculateDeadline StandingConfig {..} StandingSource {..} prob@Problem {..} user@Contestant {..} = if enableDeadlines
+calculateDeadline StandingConfig {..} src@StandingSource {..} prob@Problem {..} user@Contestant {..} = if enableDeadlines
   then
     let nextContest     = snd <$> Map.lookupGT problemContest contests
         defaultDeadline = nextContest >>= contestStartTime
         customDeadline  = fmap deadline $ lastMay $ filter (isAppliableDeadlineOption prob user) fixedDeadlines
-    in  headMay $ catMaybes [customDeadline, defaultDeadline]
+        virtualDeadline = if virtualDeadlines
+        then
+            case getVirtualStart src prob user of
+                Just time -> Just (addUTCTime (realToFrac virtualContestsTime) time)
+                _         -> Nothing
+        else Nothing
+    in  headMay $ catMaybes [virtualDeadline, customDeadline, defaultDeadline]
   else Nothing
 
 -- Standing building
