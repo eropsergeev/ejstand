@@ -17,6 +17,7 @@ module EjStand.Models.Standing
   , RunStatusType(..)
   , FixedDeadline(..)
   , ConditionalStyle(..)
+  , CustomScoring(..)
   , ColumnVariant(..)
   , OrderType(..)
   , FractionDisplayStyle(..)
@@ -122,6 +123,11 @@ data FractionDisplayStyle = DisplayAsFraction
                           | DisplayAsDecimal !Int
                           deriving (Show)
 
+data CustomScoring = CustomScoring { initialValue     :: !ELang.ASTElement
+                                   , recomputeFormula :: !ELang.ASTElement
+                                   , finalFormula     :: !ELang.ASTElement
+                                   }
+
 data StandingConfig = StandingConfig { standingName           :: !Text
                                      , standingContests       :: !(Set Integer)
                                      , internalName           :: !Text
@@ -144,8 +150,8 @@ data StandingConfig = StandingConfig { standingName           :: !Text
                                      , showLanguages          :: !Bool
                                      , showProblemStatistics  :: !Bool
                                      , fractionDisplayStyle   :: !FractionDisplayStyle
-                                     , virtualDeadlines       :: !Bool
-                                     , virtualContestsTime    :: !Integer
+                                     , virtualDeadlines       :: !(Maybe Integer)
+                                     , customScoring          :: !(Maybe CustomScoring)
                                      }
 
 data RunStatusType =  Ignore | Mistake | Rejected | Processing | Pending | Success | Disqualified | Error

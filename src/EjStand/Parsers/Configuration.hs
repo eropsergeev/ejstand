@@ -326,6 +326,14 @@ buildContestNamePattern = evalState $ do
   !_       <- ensureEmptyState
   return (regex, replacer)
 
+buildCustomScoring :: Configuration -> CustomScoring
+buildCustomScoring = evalState $ do
+  initialValue     <- takeMandatoryValue |> toTextValue |> toELangAST $ "InitialValue"
+  recomputeFormula <- takeMandatoryValue |> toTextValue |> toELangAST $ "RecomputeFormula"
+  finalFormula     <- takeMandatoryValue |> toTextValue |> toELangAST $ "FinalFormula"
+  !_               <- ensureEmptyState
+  return $ CustomScoring initialValue recomputeFormula finalFormula
+
 buildNestedOptions :: (Configuration -> a) -> Text -> TraversingState IO [a]
 buildNestedOptions builder optionName = do
   nested <- takeValuesByKey ||> toNestedConfig $ optionName
@@ -369,8 +377,8 @@ buildStandingConfig path = do
   showProblemStatistics  <- takeUniqueValue ||> toTextValue ||> toBool .> fromMaybe False $ "ShowProblemStatistics"
   fractionDisplayStyle   <-
     takeUniqueValue ||> toTextValue ||> toFractionDisplayStyle .> fromMaybe DisplayAsFraction $ "DecimalPrecision"
-  virtualDeadlines       <- takeUniqueValue ||> toTextValue ||> toBool .> fromMaybe False $ "VirtualDeadlines"
-  virtualContestsTime    <- takeUniqueValue ||> toTextValue ||> toInteger .> fromMaybe 0 $ "VirtualContestsTime"
+  virtualDeadlines       <- takeUniqueValue ||> toTextValue ||> toInteger $ "VirtualDeadlines"
+  customScoring          <- takeUniqueValue ||> toNestedConfig |.> buildCustomScoring $ "CustomScoring"
   !_                     <- ensureEmptyState
   return $ StandingConfig { standingName           = standingName
                           , standingContests       = standingContests
@@ -395,7 +403,7 @@ buildStandingConfig path = do
                           , showProblemStatistics  = showProblemStatistics
                           , fractionDisplayStyle   = fractionDisplayStyle
                           , virtualDeadlines       = virtualDeadlines
-                          , virtualContestsTime    = virtualContestsTime
+                          , customScoring          = customScoring
                           }
 
 parseStandingConfig :: FilePath -> IO StandingConfig

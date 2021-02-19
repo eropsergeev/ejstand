@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 module EjStand.StandingBuilder
   ( prepareStandingSource
   , buildStanding
@@ -21,6 +22,7 @@ import           Data.Maybe                     ( catMaybes
                                                 )
 import           Data.Ratio                     ( (%) )
 import qualified Data.Set                      as Set
+import           Data.Sequence                  ( fromList )
 import           Data.Text                      ( Text
                                                 , unpack
                                                 )
@@ -35,6 +37,7 @@ import           EjStand.Parsers.EjudgeOptions  ( updateStandingSourceWithProble
 import           EjStand.Web.HtmlElements       ( getColumnByVariant
                                                 , getColumnByVariantWithStyles
                                                 )
+import qualified EjStand.ELang                 as ELang
 import           Safe                           ( headMay
                                                 , lastMay
                                                 , minimumMay
@@ -64,12 +67,10 @@ calculateDeadline StandingConfig {..} src@StandingSource {..} prob@Problem {..} 
     let nextContest     = snd <$> Map.lookupGT problemContest contests
         defaultDeadline = nextContest >>= contestStartTime
         customDeadline  = fmap deadline $ lastMay $ filter (isAppliableDeadlineOption prob user) fixedDeadlines
-        virtualDeadline = if virtualDeadlines
-        then
-            case getVirtualStart src prob user of
-                Just time -> Just (addUTCTime (realToFrac virtualContestsTime) time)
-                _         -> Nothing
-        else Nothing
+        virtualDeadline = do
+          time <- virtualDeadlines
+          virtualStart <- getVirtualStart src prob user
+          return $ addUTCTime (fromInteger time) virtualStart
     in  headMay $ catMaybes [virtualDeadline, customDeadline, defaultDeadline]
   else Nothing
 
@@ -133,6 +134,19 @@ applicateRun cfg prob cell@StandingCell {..} runT@(Run {..}, _)
   | getRunStatusType runStatus == Disqualified = (setCellMainRunForce cfg prob runT cell) { cellScore = 0 }
   | otherwise                                  = setCellMainRunMaybe cfg prob runT cell
 
+applicateRunWithCustomScoring :: StandingConfig -> Problem -> (StandingCell, Maybe ELang.Value) -> (Run, Bool) -> (StandingCell, Maybe ELang.Value)
+applicateRunWithCustomScoring cfg@StandingConfig {..} prob state@(cell@StandingCell {..}, intermediateResult) runT@(Run {..}, overdue)
+  | getRunStatusType runStatus == Ignore       = state
+  | cellType == Error                          = state
+  | getRunStatusType runStatus == Error        = (setCellMainRunForce cfg prob runT cell, Nothing)
+  | cellType == Disqualified                   = state
+  | getRunStatusType runStatus == Disqualified = (setCellMainRunForce cfg prob runT cell, Nothing)
+  | otherwise                                  = case fromJust customScoring of
+    CustomScoring{..} -> case
+      ELang.evaluate recomputeFormula [ELang.VariableBinding "previousValue" (return (ELang.ValueList (fromList [fromJust intermediateResult, ELang.ValueBool overdue])))] of
+        Left _    -> (cell { cellType = Error }, Nothing)
+        Right val -> (setCellMainRunForce cfg prob runT cell, Just val)
+
 getVirtualStart :: StandingSource -> Problem -> Contestant -> Maybe UTCTime
 getVirtualStart StandingSource {..} Problem {..} Contestant {..} = minimumMay $ runTime <$> filter
   ((== VS) . runStatus)
@@ -144,7 +158,19 @@ buildCell cfg@StandingConfig {..} src@StandingSource {..} prob@Problem {..} user
       deadline     = calculateDeadline cfg src prob user
       startCell    = defaultCell $ contests ! problemContest
       virtualStart = if showSuccessTime then getVirtualStart src prob user else Nothing
-      cell         = foldl (applicateRun cfg prob) startCell $ applyRunDeadline deadline <$> runsList
+      cell         = case customScoring of
+        Nothing                 -> foldl (applicateRun cfg prob) startCell $ applyRunDeadline deadline <$> runsList
+        Just CustomScoring {..} -> let
+          startValue = case ELang.evaluate initialValue [] of
+            Left  _   -> Nothing
+            Right val -> Just val
+          in case foldl (applicateRunWithCustomScoring cfg prob) (startCell, startValue) $ applyRunDeadline deadline <$> runsList of
+            (cell, Nothing)     -> cell { cellType = Error }
+            (cell, Just value)  -> case ELang.evaluate finalFormula [ELang.VariableBinding "intermediateResult" (return value)] of
+              Left _            -> cell { cellType = Error }
+              Right finalValue  -> case ELang.fromValue finalValue :: Maybe Rational of
+                Nothing         -> cell { cellType = Error }
+                Just score      -> cell { cellScore = score }
   in  cell { cellStartTime = fromMaybe (cellStartTime cell) virtualStart }
 
 calculateCellStats :: StandingCell -> StandingRowStats
