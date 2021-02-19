@@ -22,7 +22,6 @@ import           Data.Maybe                     ( catMaybes
                                                 )
 import           Data.Ratio                     ( (%) )
 import qualified Data.Set                      as Set
-import           Data.Sequence                  ( fromList )
 import           Data.Text                      ( Text
                                                 , unpack
                                                 )
@@ -143,7 +142,10 @@ applicateRunWithCustomScoring cfg@StandingConfig {..} prob state@(cell@StandingC
   | getRunStatusType runStatus == Disqualified = (setCellMainRunForce cfg prob runT cell, Nothing)
   | otherwise                                  = case fromJust customScoring of
     CustomScoring{..} -> case
-      ELang.evaluate recomputeFormula [ELang.VariableBinding "previousValue" (return (ELang.ValueList (fromList [fromJust intermediateResult, ELang.ValueBool overdue])))] of
+      ELang.evaluate recomputeFormula [ ELang.VariableBinding "previousValue" (return (fromJust intermediateResult))
+                                      , ELang.VariableBinding "runScore" (return (ELang.ValueRational (fromMaybe 0 runScore)))
+                                      , ELang.VariableBinding "isOverdue" (return (ELang.ValueBool overdue))
+                                      ] of
         Left _    -> (cell { cellType = Error }, Nothing)
         Right val -> (setCellMainRunForce cfg prob runT cell, Just val)
 
