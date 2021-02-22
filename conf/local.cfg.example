@@ -183,19 +183,58 @@ InternalName = example
 --|  Option "VirtualDeadlines"
 --|    Required: optional
 --|
---|  This option sets deadlines for all contestnts as virtual start time + VirtualContestsTime (see below)
+--|  This option sets deadlines for all contestnts as virtual start time + VirtualDeadlines seconds.
 --|
 
--- VirtualDeadlines = False
+-- VirtualDeadlines = 600 -- 10 minutes
 
 --|
---|  Option "VirtualContestsTime"
+--|  Section "CustomScoring"
+--|
 --|    Required: optional
 --|
---|  Time in seconds for calculate virtual deadline
+--|    You want to make your own scoring system? Use this section!
+--|    Contestant's score will compute as function of fold of scores by each run in time order.
 --|
 
--- VirtualContestsTime = 0
+-- CustomScoring {
+  
+  --|
+  --|  Option: "InitialValue"
+  --|    Required: mandatory
+  --|
+  --|    ELang expression specifying initial value of accumulator in fold.
+  --|
+
+  -- InitialValue = 0
+
+  --|
+  --|  Option: "RecomputeFormula"
+  --|    Required: mandatory
+  --|
+  --|    ELang expression specifying formula for recomputing value by each run.
+  --|    May contain variables:
+  --|    *previousValue -- value before applying this formula
+  --|    *runScore      -- score of current run
+  --|    *isOverdue     -- True, if current run is overdue, False elses
+  --|
+
+  -- RecomputeFormula = Max(previousValue, runScore * If(isOverdue, 1, 3 / 4))
+
+  --|
+  --|  Option: "FinalFormula"
+  --|    Required: mandatory
+  --|
+  --|    ELang expression specifying formula for recomput final score by each fold's result.
+  --|    Must return number.
+  --|    May contain variables:
+  --|    *intermediateResult -- fold's result
+  --|
+
+
+  -- FinalFormula = intermediateResult
+
+-- }
 
 --|
 --|  Section "SetFixedDeadline"
