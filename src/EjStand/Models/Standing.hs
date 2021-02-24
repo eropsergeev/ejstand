@@ -25,6 +25,8 @@ module EjStand.Models.Standing
   , getRunStatusType
   , allColumnVariants
   , readColumnVariant
+  , readRunStatusType
+  , allRunStatusTypees
   )
 where
 
@@ -152,10 +154,14 @@ data StandingConfig = StandingConfig { standingName           :: !Text
                                      , fractionDisplayStyle   :: !FractionDisplayStyle
                                      , virtualDeadlines       :: !(Maybe Integer)
                                      , customScoring          :: !(Maybe CustomScoring)
+                                     , cellConditionalStyles  :: !(Map RunStatusType [ConditionalStyle])
                                      }
 
 data RunStatusType =  Ignore | Mistake | Rejected | Processing | Pending | Success | Disqualified | Error
   deriving (Show, Eq, Ord, Bounded, Enum)
+
+mkADTReader ''RunStatusType "readRunStatusType" id
+mkADTReaderList ''RunStatusType "allRunStatusTypees" id
 
 runStatusTypeMap :: Map RunStatus RunStatusType
 runStatusTypeMap = $( [| runStatusTypeMap' |] )

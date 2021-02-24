@@ -388,7 +388,18 @@ renderCell st@Standing { standingConfig = StandingConfig {..}, ..} row problem c
   additionalContent    = if allowCellContent then selectAdditionalCellContentBuilders st <*> [cell] else []
   addRunStatusCellText = span ! class_ "run_status"
   ifNotScores x = if enableScores then mempty else x
-  cellTag'                               = cellTag ! title (toValue $ buildCellTitle st row problem cell)
+  cellTag' = foldl (!) (cellTag ! title (toValue $ buildCellTitle st row problem cell)) stylesToApply
+  stylesToApply = case Map.lookup cellType cellConditionalStyles of
+    Nothing     -> []
+    Just styles ->
+      [ style (toValue styleValue)
+      | ConditionalStyle {..} <- styles
+      , case ELang.evaluate conditions [ ELang.VariableBinding "score" (return (ELang.toValue cellScore)) ] of
+        Left errorMsg -> throw $ InvalidElangExpression errorMsg
+        Right value   -> case (ELang.fromValue value :: Maybe Bool) of
+          Nothing       -> throw $ BoolValueExpected value
+          Just result   -> result
+      ]
   (cellTag, cellValue, allowCellContent) = case cellType of
     Success      -> if cellIsOverdue
       then (td ! class_ "overdue", ifNotScores $ addRunStatusCellText "+.", True)
@@ -400,6 +411,7 @@ renderCell st@Standing { standingConfig = StandingConfig {..}, ..} row problem c
     Ignore       -> (td ! class_ "none", "", True)
     Disqualified -> (td ! class_ "disqualified", "", False)
     Error        -> (td ! class_ "error", addRunStatusCellText "✖", False)
+
 
 renderProblemSuccesses :: Standing -> Problem -> Markup
 renderProblemSuccesses Standing {..} problem =

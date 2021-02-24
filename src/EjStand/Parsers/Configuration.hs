@@ -75,6 +75,7 @@ data ParsingException = NoValue Text
                       | InvalidCondition Text Text
                       | InvalidRegex Text Text
                       | InvalidColumnName Text Text
+                      | InvalidRunStatusType Text Text
                       | FileNotFound Text Text
                       | UnexpectedKey Text
                       | ELangError Text Text
@@ -102,6 +103,7 @@ instance Show ParsingException where
   show (InvalidRegex key value) =
     sconcat ["Unable to parse value \"", value, "\" to regular expression on key \"", key, "\""]
   show (InvalidColumnName key col) = sconcat ["Unknown column name \"", col, "\" on key \"", key, "\""]
+  show (InvalidRunStatusType key status) = sconcat ["Unknown run status type \"", status, "\" on key \"", key, "\""]
   show (FileNotFound key filename) =
     sconcat ["File \"", filename, "\" was mentioned in key \"", key, "\" value, but can't be found or unreadable"]
   show (UnexpectedKey key      ) = sconcat ["Unexpected key \"", key, "\""]
@@ -259,6 +261,16 @@ toColumnVariant key value =
 toColumnVariantL :: Text -> Text -> [ColumnVariant]
 toColumnVariantL key value = toColumnVariant key <$> Text.splitOn "," value
 
+toCellStatus :: Text -> Text -> RunStatusType
+toCellStatus key value =
+  let value' = Text.strip value
+  in  case readRunStatusType value' of
+        Nothing   -> throw $ InvalidRunStatusType key value'
+        (Just cv) -> cv
+
+toCellStatusL :: Text -> Text -> [RunStatusType]
+toCellStatusL key value = toCellStatus key <$> Text.splitOn "," value
+
 toRowSortingOrderL :: Text -> Text -> [(OrderType, ColumnVariant)]
 toRowSortingOrderL key value = toRowSortingOrder key . Text.strip <$> Text.splitOn "," value
  where
@@ -318,6 +330,14 @@ buildConditionalStyle = evalState $ do
   columnNames <- takeUniqueValue ||> toTextValue ||> toColumnVariantL .> fromMaybe [ScoreColumnVariant] $ "ColumnNames"
   !_          <- ensureEmptyState
   return [ (columnName, [ConditionalStyle conditions styleValue]) | columnName <- columnNames ]
+
+buildCellConditionalStyle :: Configuration -> [(RunStatusType, [ConditionalStyle])]
+buildCellConditionalStyle = evalState $ do
+  styleValue      <- takeMandatoryValue |> toTextValue $ "StyleValue"
+  conditions      <- takeMandatoryValue |> toTextValue |> toELangAST $ "Condition"
+  runStatusTypes  <- takeUniqueValue ||> toTextValue ||> toCellStatusL .> fromMaybe [Mistake, Success] $ "runStatusTypes"
+  !_              <- ensureEmptyState
+  return [ (runStatusType, [ConditionalStyle conditions styleValue]) | runStatusType <- runStatusTypes ]
 
 buildContestNamePattern :: Configuration -> (RE.Regex, RE.Replacer)
 buildContestNamePattern = evalState $ do
@@ -379,6 +399,7 @@ buildStandingConfig path = do
     takeUniqueValue ||> toTextValue ||> toFractionDisplayStyle .> fromMaybe DisplayAsFraction $ "DecimalPrecision"
   virtualDeadlines       <- takeUniqueValue ||> toTextValue ||> toInteger $ "VirtualDeadlines"
   customScoring          <- takeUniqueValue ||> toNestedConfig |.> buildCustomScoring $ "CustomScoring"
+  cellConditionalStyles      <- buildNestedOptions buildCellConditionalStyle "CellConditionalStyle"
   !_                     <- ensureEmptyState
   return $ StandingConfig { standingName           = standingName
                           , standingContests       = standingContests
@@ -404,6 +425,7 @@ buildStandingConfig path = do
                           , fractionDisplayStyle   = fractionDisplayStyle
                           , virtualDeadlines       = virtualDeadlines
                           , customScoring          = customScoring
+                          , cellConditionalStyles  = Map.fromListWith (++) . mconcat $ cellConditionalStyles
                           }
 
 parseStandingConfig :: FilePath -> IO StandingConfig
