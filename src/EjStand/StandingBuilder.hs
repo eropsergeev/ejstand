@@ -70,7 +70,7 @@ calculateDeadline StandingConfig {..} src@StandingSource {..} prob@Problem {..} 
           time <- virtualDeadlines
           virtualStart <- getVirtualStart src prob user
           return $ addUTCTime (fromInteger time) virtualStart
-    in  headMay $ catMaybes [virtualDeadline, customDeadline, defaultDeadline]
+    in  headMay $ catMaybes [customDeadline, virtualDeadline, defaultDeadline]
   else Nothing
 
 -- Standing building
